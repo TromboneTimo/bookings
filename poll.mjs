@@ -11,6 +11,8 @@
 //   ALERT_EMAIL_TO        where alerts go (default: GMAIL_USER)
 //   CALLMEBOT_PHONE       WhatsApp number in E.164, e.g. +8190xxxxxxxx
 //   CALLMEBOT_APIKEY      key CallMeBot sends you after activation
+// GITHUB_TOKEN / GITHUB_REPOSITORY are provided by Actions: every alert also
+// becomes a GitHub issue, and GitHub emails the repo owner about it.
 // Optional: DRY_RUN=1 prints alerts instead of sending; ALERT_TZ (default Asia/Tokyo).
 
 import fs from "node:fs";
@@ -20,6 +22,7 @@ const {
   CALENDLY_TOKEN, CALENDLY_USER_URI,
   GMAIL_USER, GMAIL_APP_PASSWORD, ALERT_EMAIL_TO,
   CALLMEBOT_PHONE, CALLMEBOT_APIKEY,
+  GITHUB_TOKEN, GITHUB_REPOSITORY,
   DRY_RUN, ALERT_TZ = "Asia/Tokyo",
 } = process.env;
 
@@ -91,6 +94,17 @@ async function sendEmail(a) {
   await t.sendMail({ from: `Calendly Alert <${GMAIL_USER}>`, to: ALERT_EMAIL_TO || GMAIL_USER, subject: a.subject, text: a.text });
   return "email: sent";
 }
+// Zero-credential email: open a GitHub issue. GitHub emails the repo owner the
+// full body (issues are created by the Actions bot, so the owner is notified).
+async function sendIssue(a) {
+  if (!GITHUB_TOKEN || !GITHUB_REPOSITORY) return "issue: skipped (not on Actions)";
+  const r = await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/issues`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+    body: JSON.stringify({ title: a.subject, body: "```\n" + a.text + "\n```", labels: [a.text.startsWith("CANCELED") ? "canceled" : "booking"] }),
+  });
+  return `issue: ${r.status}${r.ok ? " " + (await r.json()).html_url : " " + (await r.text()).slice(0, 100)}`;
+}
 async function sendWhatsApp(a) {
   if (!CALLMEBOT_PHONE || !CALLMEBOT_APIKEY) return "whatsapp: skipped (no CALLMEBOT_* secrets)";
   const u = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(CALLMEBOT_PHONE)}&apikey=${encodeURIComponent(CALLMEBOT_APIKEY)}&text=${encodeURIComponent(a.text)}`;
@@ -102,6 +116,7 @@ console.log(`${events.length} events checked, ${alerts.length} alert(s)${firstRu
 for (const a of alerts) {
   console.log("----\n" + a.text);
   if (DRY_RUN) { console.log("(dry run, not sent)"); continue; }
+  console.log(await sendIssue(a).catch((e) => `issue: FAILED ${e.message}`));
   console.log(await sendEmail(a).catch((e) => `email: FAILED ${e.message}`));
   console.log(await sendWhatsApp(a).catch((e) => `whatsapp: FAILED ${e.message}`));
 }
