@@ -123,12 +123,21 @@ state.last_run = new Date().toISOString();
 async function sendEmail(a) {
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) return "email: skipped (no GMAIL_* secrets)";
   const t = nodemailer.createTransport({ service: "gmail", auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD } });
-  await t.sendMail({ from: `Calendly Alert <${GMAIL_USER}>`, to: ALERT_EMAIL_TO || GMAIL_USER, subject: a.subject, text: a.markdown });
+  const esc = (x) => String(x).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const html = a.markdown.split("\n").filter((l) => !l.startsWith("@")).map((l) => {
+    if (l.startsWith("## ")) return `<h2 style="font:600 20px -apple-system,Helvetica,Arial;margin:0 0 16px">${esc(l.slice(3))}</h2>`;
+    if (l.startsWith("### ")) return `<h3 style="font:600 16px -apple-system,Helvetica,Arial;margin:20px 0 8px">${esc(l.slice(4))}</h3>`;
+    let t = esc(l).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2">$1</a>').replace(/(^|\s)(https?:\/\/\S+)/g, '$1<a href="$2">$2</a>');
+    if (t.startsWith("- ")) t = "&nbsp;&nbsp;" + t.slice(2);
+    return t ? `<div style="font:14px/1.5 -apple-system,Helvetica,Arial;color:#222">${t}</div>` : "<div style=\"height:8px\"></div>";
+  }).join("");
+  await t.sendMail({ from: `Calendly <${GMAIL_USER}>`, to: ALERT_EMAIL_TO || GMAIL_USER, subject: a.subject, text: a.markdown, html: `<div style="max-width:600px;margin:0 auto;padding:20px">${html}</div>` });
   return "email: sent";
 }
 // Zero-credential email: open a GitHub issue. GitHub emails the repo owner the
 // full body (issues are created by the Actions bot, so the owner is notified).
 async function sendIssue(a) {
+  if (GMAIL_USER && GMAIL_APP_PASSWORD) return "issue: skipped (Gmail configured, no duplicate)";
   if (!GITHUB_TOKEN || !GITHUB_REPOSITORY) return "issue: skipped (not on Actions)";
   const r = await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/issues`, {
     method: "POST",
