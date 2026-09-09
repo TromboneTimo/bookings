@@ -1,0 +1,22 @@
+{
+  "events": {
+    "04c638fa-6bcd-4617-b6f8-0a34efae3da3": {
+      "status": "canceled",
+      "start": "2026-09-25T11:45:00.000000Z"
+    },
+    "ef207ec8-bfab-420f-8421-4047f85d987b": {
+      "status": "active",
+      "start": "2026-09-23T00:00:00.000000Z"
+    },
+    "b3db1849-6970-4edb-9abe-252bd0399c3f": {
+      "status": "active",
+      "start": "2026-09-11T11:00:00.000000Z"
+    },
+    "7a773ee8-695b-4ed5-95b6-3735aa39caca": {
+      "status": "canceled",
+      "start": "2026-09-30T00:00:00.000000Z"
+    }
+  },
+  "initialized": true,
+  "last_run": "2026-09-09T00:34:24.607Z"
+}

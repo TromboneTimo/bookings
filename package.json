@@ -1,0 +1,8 @@
+{
+  "name": "calendly-alert",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "poll": "node poll.mjs" },
+  "dependencies": { "nodemailer": "^6.9.14" }
+}
