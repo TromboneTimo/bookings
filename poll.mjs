@@ -107,7 +107,9 @@ for (const ev of events) {
   if (canceled) wa.push(`Reason: ${ev.cancellation?.reason || "none given"}`);
   if (zoom) wa.push(zoom);
   a.text = wa.join("\n");
-  a.subject = `${kind}: ${inv.name || "?"} - ${when.you} - ${ev.name}`;
+  // Subject stays short: GitHub wraps it in "[owner/repo] ... (#n)" on the email.
+  const shortWhen = new Date(ev.start_time).toLocaleString("en-US", { timeZone: ALERT_TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  a.subject = `${canceled ? "Canceled" : "New booking"}: ${inv.name || "?"}, ${shortWhen}`;
   alerts.push(a);
   state.events[uuid] = { status: ev.status, start: ev.start_time };
 }
