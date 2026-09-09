@@ -11,6 +11,7 @@
 //   ALERT_EMAIL_TO        where alerts go (default: GMAIL_USER)
 //   CALLMEBOT_PHONE       WhatsApp number in E.164, e.g. +8190xxxxxxxx
 //   CALLMEBOT_APIKEY      key CallMeBot sends you after activation
+//   DISCORD_WEBHOOK_URL   Discord channel webhook (phone push via the Discord app)
 // GITHUB_TOKEN / GITHUB_REPOSITORY are provided by Actions: every alert also
 // becomes a GitHub issue, and GitHub emails the repo owner about it.
 // Optional: DRY_RUN=1 prints alerts instead of sending; ALERT_TZ (default Asia/Tokyo).
@@ -22,7 +23,7 @@ const {
   CALENDLY_TOKEN, CALENDLY_USER_URI,
   GMAIL_USER, GMAIL_APP_PASSWORD, ALERT_EMAIL_TO,
   CALLMEBOT_PHONE, CALLMEBOT_APIKEY,
-  GITHUB_TOKEN, GITHUB_REPOSITORY,
+  GITHUB_TOKEN, GITHUB_REPOSITORY, DISCORD_WEBHOOK_URL,
   DRY_RUN, ALERT_TZ = "Asia/Tokyo",
 } = process.env;
 
@@ -134,6 +135,28 @@ async function sendIssue(a) {
   });
   return `issue: ${r.status}${r.ok ? " " + (await r.json()).html_url : " " + (await r.text()).slice(0, 100)}`;
 }
+// Discord: one embed per alert. The Discord mobile app pushes it to the phone.
+async function sendDiscord(a) {
+  if (!DISCORD_WEBHOOK_URL) return "discord: skipped (no DISCORD_WEBHOOK_URL)";
+  const canceled = a.kind === "CANCELED";
+  const fields = [
+    { name: "Invitee", value: `${a.inv.name || "?"}\n${a.inv.email || "?"}`, inline: true },
+    { name: "When", value: `${a.when.you}\n${a.when.ny}`, inline: true },
+  ];
+  if (a.inv.timezone) fields.push({ name: "Invitee time zone", value: a.inv.timezone, inline: true });
+  for (const q of a.qa.slice(0, 8)) fields.push({ name: q.question.slice(0, 256), value: q.answer.slice(0, 1024) });
+  if (canceled) fields.push({ name: "Reason", value: `${a.cancellation?.reason || "none given"} (by ${a.cancellation?.canceler_type || "?"})` });
+  const links = [a.zoom ? `[Zoom](${a.zoom})` : null, a.inv.reschedule_url ? `[Reschedule](${a.inv.reschedule_url})` : null].filter(Boolean).join(" · ");
+  if (links) fields.push({ name: "Links", value: links });
+  const r = await fetch(DISCORD_WEBHOOK_URL, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: "Calendly", content: `${canceled ? "❌" : "📅"} **${a.kind}: ${a.event}**`,
+      embeds: [{ title: a.subject, color: canceled ? 0xed4245 : 0x57f287, fields, footer: { text: "calendly-alert" }, timestamp: new Date().toISOString() }],
+    }),
+  });
+  return `discord: ${r.status}${r.ok ? "" : " " + (await r.text()).slice(0, 100)}`;
+}
 async function sendWhatsApp(a) {
   if (!CALLMEBOT_PHONE || !CALLMEBOT_APIKEY) return "whatsapp: skipped (no CALLMEBOT_* secrets)";
   const u = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(CALLMEBOT_PHONE)}&apikey=${encodeURIComponent(CALLMEBOT_APIKEY)}&text=${encodeURIComponent(a.text)}`;
@@ -146,6 +169,7 @@ for (const a of alerts) {
   console.log("----\n" + a.markdown);
   if (DRY_RUN) { console.log("(dry run, not sent)"); continue; }
   console.log(await sendIssue(a).catch((e) => `issue: FAILED ${e.message}`));
+  console.log(await sendDiscord(a).catch((e) => `discord: FAILED ${e.message}`));
   console.log(await sendEmail(a).catch((e) => `email: FAILED ${e.message}`));
   console.log(await sendWhatsApp(a).catch((e) => `whatsapp: FAILED ${e.message}`));
 }
