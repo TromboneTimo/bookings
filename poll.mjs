@@ -101,7 +101,7 @@ async function sendIssue(a) {
   const r = await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/issues`, {
     method: "POST",
     headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
-    body: JSON.stringify({ title: a.subject, body: "```\n" + a.text + "\n```", labels: [a.text.startsWith("CANCELED") ? "canceled" : "booking"] }),
+    body: JSON.stringify({ title: a.subject, body: "@" + GITHUB_REPOSITORY.split("/")[0] + "\n\n```\n" + a.text + "\n```", assignees: [GITHUB_REPOSITORY.split("/")[0]], labels: [a.text.startsWith("CANCELED") ? "canceled" : "booking"] }),
   });
   return `issue: ${r.status}${r.ok ? " " + (await r.json()).html_url : " " + (await r.text()).slice(0, 100)}`;
 }
