@@ -1,7 +1,8 @@
 name: Calendly booking alerts
 on:
-  schedule:
-    - cron: "*/5 * * * *"
+  # No schedule: as of 2026-09-18 the 5-minute poll runs in fb-funnel
+  # (/api/book?poll=1, driven by Supabase pg_cron). GitHub throttled this cron to
+  # about 7 runs a day, which is why it moved. Manual dispatch only now.
   workflow_dispatch:
 concurrency: { group: poll, cancel-in-progress: false }
 permissions: { contents: write, issues: write }
